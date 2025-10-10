@@ -10,7 +10,6 @@ const projectSchema = new mongoose.Schema({
   code: {
     type: String,
     required: [true, 'Project code is required'],
-    unique: true,
     uppercase: true,
     trim: true,
     maxlength: [20, 'Project code cannot exceed 20 characters']
@@ -55,7 +54,7 @@ const projectSchema = new mongoose.Schema({
 });
 
 // Index for faster queries
-projectSchema.index({ code: 1 });
+projectSchema.index({ code: 1 }, { unique: true });
 projectSchema.index({ status: 1 });
 
 module.exports = mongoose.model('Project', projectSchema);

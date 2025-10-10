@@ -10,7 +10,6 @@ const costCenterSchema = new mongoose.Schema({
   code: {
     type: String,
     required: [true, 'Cost center code is required'],
-    unique: true,
     uppercase: true,
     trim: true,
     maxlength: [20, 'Cost center code cannot exceed 20 characters']
@@ -42,6 +41,6 @@ const costCenterSchema = new mongoose.Schema({
 });
 
 // Index for faster queries
-costCenterSchema.index({ code: 1 });
+costCenterSchema.index({ code: 1 }, { unique: true });
 
 module.exports = mongoose.model('CostCenter', costCenterSchema);
