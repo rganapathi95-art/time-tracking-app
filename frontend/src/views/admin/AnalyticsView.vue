@@ -178,7 +178,7 @@
                     <td class="table-cell">{{ cc.department || '-' }}</td>
                     <td class="table-cell">{{ cc.totalHours }}h</td>
                     <td class="table-cell">${{ cc.totalCost.toLocaleString() }}</td>
-                    <td class="table-cell">${{{ cc.costCenterBudget.toLocaleString() }}</td>
+                    <td class="table-cell">${{ cc.costCenterBudget.toLocaleString() }}</td>
                     <td class="table-cell">
                       <div class="flex items-center">
                         <div class="flex-1 bg-gray-200 rounded-full h-2 mr-2">
