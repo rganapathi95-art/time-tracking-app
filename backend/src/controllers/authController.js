@@ -3,10 +3,22 @@ const User = require('../models/User');
 
 // Generate JWT Token
 const generateToken = (id) => {
-  return jwt.sign({ id }, process.env.JWT_SECRET, {
-    expiresIn: process.env.JWT_EXPIRE
-  });
+  return jwt.sign(
+    { id },
+    process.env.JWT_SECRET,
+    {
+      expiresIn: process.env.JWT_EXPIRE,
+      issuer: process.env.JWT_ISSUER || 'time-tracking-api',
+      audience: process.env.JWT_AUDIENCE || 'time-tracking-frontend',
+      algorithm: 'HS256'
+    }
+  );
 };
+
+// Brute-force and lockout configuration
+const MAX_ATTEMPTS = parseInt(process.env.LOGIN_MAX_ATTEMPTS || '5', 10);
+const WINDOW_MINUTES = parseInt(process.env.LOGIN_ATTEMPT_WINDOW_MINUTES || '15', 10); // rolling window to count attempts
+const LOCKOUT_MINUTES = parseInt(process.env.LOGIN_LOCKOUT_MINUTES || '15', 10); // lockout duration after hitting max
 
 // @desc    Register user
 // @route   POST /api/auth/register
@@ -85,17 +97,55 @@ exports.login = async (req, res, next) => {
       });
     }
 
+    // Check lockout status
+    const now = new Date();
+    if (user.lockUntil && user.lockUntil > now) {
+      const remainingMs = user.lockUntil.getTime() - now.getTime();
+      const remainingMin = Math.ceil(remainingMs / 60000);
+      return res.status(429).json({
+        success: false,
+        message: `Account temporarily locked due to repeated failed logins. Try again in ${remainingMin} minute(s).`
+      });
+    }
+
     // Check password
     const isMatch = await user.comparePassword(password);
 
     if (!isMatch) {
+      // Failed login handling: track attempts within rolling window
+      const last = user.lastFailedLoginAt ? new Date(user.lastFailedLoginAt) : null;
+      const windowAgo = new Date(Date.now() - WINDOW_MINUTES * 60 * 1000);
+
+      if (!last || last < windowAgo) {
+        // Window expired, reset attempts
+        user.failedLoginAttempts = 1;
+      } else {
+        user.failedLoginAttempts = (user.failedLoginAttempts || 0) + 1;
+      }
+      user.lastFailedLoginAt = now;
+
+      if (user.failedLoginAttempts >= MAX_ATTEMPTS) {
+        user.lockUntil = new Date(Date.now() + LOCKOUT_MINUTES * 60 * 1000);
+        user.failedLoginAttempts = 0; // reset counter after lockout is set
+      }
+
+      await user.save({ validateBeforeSave: false });
+
       return res.status(401).json({
         success: false,
         message: 'Invalid credentials'
       });
     }
 
-    // Generate token
+    // Successful login: reset counters
+    if (user.failedLoginAttempts || user.lockUntil || user.lastFailedLoginAt) {
+      user.failedLoginAttempts = 0;
+      user.lockUntil = null;
+      user.lastFailedLoginAt = null;
+      await user.save({ validateBeforeSave: false });
+    }
+
+    // Generate token (with issuer/audience)
     const token = generateToken(user._id);
 
     res.status(200).json({

@@ -53,7 +53,20 @@ const userSchema = new mongoose.Schema({
   assignedProjects: [{
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Project'
-  }]
+  }],
+  // Brute-force protection fields
+  failedLoginAttempts: {
+    type: Number,
+    default: 0
+  },
+  lockUntil: {
+    type: Date,
+    default: null
+  },
+  lastFailedLoginAt: {
+    type: Date,
+    default: null
+  }
 }, {
   timestamps: true
 });

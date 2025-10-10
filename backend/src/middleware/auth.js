@@ -19,8 +19,16 @@ exports.protect = async (req, res, next) => {
   }
 
   try {
-    // Verify token
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    // Verify token with strict options
+    const verifyOptions = {
+      algorithms: ['HS256'],
+      issuer: process.env.JWT_ISSUER || 'time-tracking-api',
+      audience: process.env.JWT_AUDIENCE || 'time-tracking-frontend',
+      maxAge: process.env.JWT_EXPIRE || '1h',
+      clockTolerance: 5 // seconds of clock skew tolerance
+    };
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET, verifyOptions);
 
     // Get user from token
     req.user = await User.findById(decoded.id).select('-password');

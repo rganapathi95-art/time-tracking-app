@@ -22,9 +22,28 @@ connectDB();
 
 const app = express();
 
+// CORS configuration: restrict to allowed origins
+const allowedOrigins = (process.env.ALLOWED_ORIGINS || 'http://localhost:5173,http://localhost:3000')
+  .split(',')
+  .map((o) => o.trim());
+
+const corsOptions = {
+  origin: function (origin, callback) {
+    // Allow server-to-server or curl (no origin) and allowed origins
+    if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: false
+};
+
 // Security middleware
 app.use(helmet());
-app.use(cors());
+app.use(cors(corsOptions));
 app.use(mongoSanitize());
 app.use(xss());
 
