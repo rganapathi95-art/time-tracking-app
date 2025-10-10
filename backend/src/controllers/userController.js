@@ -12,7 +12,10 @@ exports.getUsers = async (req, res, next) => {
     
     if (role) query.role = role;
     if (department) query.department = department;
-    if (isActive !== undefined) query.isActive = isActive === 'true';
+    // Only add isActive filter if it's explicitly 'true' or 'false', not empty string
+    if (isActive !== undefined && isActive !== '') {
+      query.isActive = isActive === 'true';
+    }
     
     // Search by name or email
     if (search) {

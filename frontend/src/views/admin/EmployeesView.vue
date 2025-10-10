@@ -230,10 +230,13 @@ const selectedEmployee = ref(null)
 const fetchEmployees = async () => {
   loading.value = true
   try {
-    const response = await userService.getUsers({
-      role: 'employee',
-      ...filters.value
-    })
+    // Build params object, excluding empty strings
+    const params = { role: 'employee' }
+    if (filters.value.search) params.search = filters.value.search
+    if (filters.value.department) params.department = filters.value.department
+    if (filters.value.isActive) params.isActive = filters.value.isActive
+    
+    const response = await userService.getUsers(params)
     // Backend returns { success, count, data }
     employees.value = response.data || []
     console.log('Employees loaded:', employees.value.length)
