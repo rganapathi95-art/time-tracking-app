@@ -234,9 +234,12 @@ const fetchEmployees = async () => {
       role: 'employee',
       ...filters.value
     })
-    employees.value = response.data
+    // Backend returns { success, count, data }
+    employees.value = response.data || []
+    console.log('Employees loaded:', employees.value.length)
   } catch (error) {
     console.error('Error fetching employees:', error)
+    console.error('Error details:', error.response?.data)
   } finally {
     loading.value = false
   }
