@@ -4,11 +4,15 @@ const {
   getEmployeeHours,
   getProjectAllocation,
   getCostCenterSummary,
-  getDashboardStats
+  getDashboardStats,
+  getMyAnalytics
 } = require('../controllers/analyticsController');
 const { protect, authorize } = require('../middleware/auth');
 
-// All routes require authentication and admin role
+// Employee analytics (accessible to all authenticated users)
+router.get('/my-analytics', protect, getMyAnalytics);
+
+// Admin-only routes
 router.use(protect);
 router.use(authorize('admin'));
 

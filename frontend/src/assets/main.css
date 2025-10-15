@@ -14,7 +14,7 @@
   }
   
   .btn-primary {
-    @apply bg-primary-600 text-white hover:bg-primary-700 focus:ring-primary-500;
+    @apply bg-primary-500 text-ink-900 hover:bg-primary-400 focus:ring-ink-900;
   }
   
   .btn-secondary {
@@ -75,5 +75,35 @@
   
   .badge-gray {
     @apply bg-gray-100 text-gray-800;
+  }
+
+  .badge-secondary {
+    @apply bg-gray-200 text-gray-700;
+  }
+
+  /* Responsive table wrapper */
+  .table-responsive {
+    @apply overflow-x-auto -mx-4 sm:mx-0;
+  }
+
+  /* Mobile-friendly cards */
+  .mobile-card {
+    @apply block sm:hidden;
+  }
+
+  .desktop-table {
+    @apply hidden sm:block;
+  }
+}
+
+/* Responsive utilities */
+@layer utilities {
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+  
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
   }
 }

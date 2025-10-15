@@ -11,6 +11,12 @@ const router = createRouter({
       meta: { requiresAuth: false }
     },
     {
+      path: '/set-password',
+      name: 'SetPassword',
+      component: () => import('../views/SetPasswordView.vue'),
+      meta: { requiresAuth: false }
+    },
+    {
       path: '/',
       redirect: '/dashboard'
     },
@@ -18,6 +24,12 @@ const router = createRouter({
       path: '/dashboard',
       name: 'Dashboard',
       component: () => import('../views/DashboardView.vue'),
+      meta: { requiresAuth: true }
+    },
+    {
+      path: '/profile',
+      name: 'Profile',
+      component: () => import('../views/ProfileView.vue'),
       meta: { requiresAuth: true }
     },
     // Admin routes
@@ -49,6 +61,16 @@ const router = createRouter({
           path: 'timesheets',
           name: 'AdminTimesheets',
           component: () => import('../views/admin/TimesheetsView.vue')
+        },
+        {
+          path: 'reports',
+          name: 'Reports',
+          component: () => import('../views/admin/ReportsView.vue')
+        },
+        {
+          path: 'settings',
+          name: 'Settings',
+          component: () => import('../views/admin/SettingsView.vue')
         }
       ]
     },

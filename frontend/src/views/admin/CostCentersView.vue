@@ -36,7 +36,7 @@
                   <span class="badge badge-info">{{ costCenter.code }}</span>
                 </td>
                 <td class="table-cell">{{ costCenter.department || '-' }}</td>
-                <td class="table-cell">${{ costCenter.budget?.toLocaleString() || 0 }}</td>
+                <td class="table-cell">{{ formatCurrency(costCenter.budget || 0, costCenter.currency || 'USD') }}</td>
                 <td class="table-cell">
                   {{ costCenter.manager ? `${costCenter.manager.firstName} ${costCenter.manager.lastName}` : '-' }}
                 </td>
@@ -112,6 +112,14 @@
                 <input v-model.number="form.budget" type="number" step="0.01" class="input" />
               </div>
               <div>
+                <label class="label">Currency</label>
+                <select v-model="form.currency" class="input">
+                  <option v-for="curr in currencies" :key="curr.code" :value="curr.code">
+                    {{ curr.code }} - {{ curr.name }} ({{ curr.symbol }})
+                  </option>
+                </select>
+              </div>
+              <div>
                 <label class="label">Manager</label>
                 <select v-model="form.manager" class="input">
                   <option value="">Select Manager</option>
@@ -148,11 +156,13 @@
 import { ref, onMounted } from 'vue'
 import MainLayout from '../../components/Layout/MainLayout.vue'
 import costCenterService from '../../services/costCenterService'
+import utilityService from '../../services/utilityService'
 import userService from '../../services/userService'
 import { Plus, Edit2, Trash2, Building2, X, Loader2 } from 'lucide-vue-next'
 
 const costCenters = ref([])
 const users = ref([])
+const currencies = ref([])
 const loading = ref(false)
 const showCreateModal = ref(false)
 const showEditModal = ref(false)
@@ -165,6 +175,7 @@ const form = ref({
   description: '',
   department: '',
   budget: 0,
+  currency: 'USD',
   manager: '',
   isActive: true
 })
@@ -200,6 +211,7 @@ const editCostCenter = (costCenter) => {
     description: costCenter.description || '',
     department: costCenter.department || '',
     budget: costCenter.budget || 0,
+    currency: costCenter.currency || 'USD',
     manager: costCenter.manager?._id || '',
     isActive: costCenter.isActive
   }
@@ -249,13 +261,29 @@ const closeModal = () => {
     description: '',
     department: '',
     budget: 0,
+    currency: 'USD',
     manager: '',
     isActive: true
   }
 }
 
+const fetchCurrencies = async () => {
+  try {
+    const response = await utilityService.getCurrencies()
+    currencies.value = response.data || []
+  } catch (error) {
+    console.error('Error fetching currencies:', error)
+  }
+}
+
+const formatCurrency = (amount, currencyCode) => {
+  const currency = currencies.value.find(c => c.code === currencyCode) || { symbol: '$' }
+  return `${currency.symbol}${amount.toLocaleString()}`
+}
+
 onMounted(() => {
   fetchCostCenters()
   fetchUsers()
+  fetchCurrencies()
 })
 </script>

@@ -1,7 +1,8 @@
-const Timesheet = require('../models/Timesheet');
-const Project = require('../models/Project');
 const User = require('../models/User');
+const Project = require('../models/Project');
+const Timesheet = require('../models/Timesheet');
 const CostCenter = require('../models/CostCenter');
+const mongoose = require('mongoose');
 
 // @desc    Get employee hours summary
 // @route   GET /api/analytics/employee-hours
@@ -289,6 +290,165 @@ exports.getDashboardStats = async (req, res, next) => {
         pendingTimesheets,
         monthlyHours: monthlyHours[0]?.total || 0,
         weeklyHours: weeklyHours[0]?.total || 0
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Get employee personal analytics
+// @route   GET /api/analytics/my-analytics
+// @access  Private/Employee
+exports.getMyAnalytics = async (req, res, next) => {
+  try {
+    const employeeId = req.user.id;
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const startOfWeek = new Date(now.setDate(now.getDate() - now.getDay()));
+    const startOfYear = new Date(now.getFullYear(), 0, 1);
+
+    // Get employee's timesheets statistics
+    const [
+      totalHoursLogged,
+      monthlyHours,
+      weeklyHours,
+      pendingTimesheets,
+      approvedTimesheets,
+      rejectedTimesheets,
+      projectsWorkedOn,
+      recentTimesheets,
+      monthlyTrend
+    ] = await Promise.all([
+      // Total hours logged (all time, approved)
+      Timesheet.aggregate([
+        { $match: { employee: mongoose.Types.ObjectId(employeeId), status: 'approved' } },
+        { $group: { _id: null, total: { $sum: '$hours' } } }
+      ]),
+      // Monthly hours
+      Timesheet.aggregate([
+        { $match: { employee: mongoose.Types.ObjectId(employeeId), date: { $gte: startOfMonth }, status: 'approved' } },
+        { $group: { _id: null, total: { $sum: '$hours' } } }
+      ]),
+      // Weekly hours
+      Timesheet.aggregate([
+        { $match: { employee: mongoose.Types.ObjectId(employeeId), date: { $gte: startOfWeek }, status: 'approved' } },
+        { $group: { _id: null, total: { $sum: '$hours' } } }
+      ]),
+      // Pending timesheets count
+      Timesheet.countDocuments({ employee: employeeId, status: 'submitted' }),
+      // Approved timesheets count
+      Timesheet.countDocuments({ employee: employeeId, status: 'approved' }),
+      // Rejected timesheets count
+      Timesheet.countDocuments({ employee: employeeId, status: 'rejected' }),
+      // Projects worked on
+      Timesheet.aggregate([
+        { $match: { employee: mongoose.Types.ObjectId(employeeId) } },
+        { $group: { _id: '$project' } },
+        {
+          $lookup: {
+            from: 'projects',
+            localField: '_id',
+            foreignField: '_id',
+            as: 'project'
+          }
+        },
+        { $unwind: '$project' },
+        {
+          $project: {
+            _id: '$project._id',
+            name: '$project.name',
+            code: '$project.code',
+            status: '$project.status'
+          }
+        }
+      ]),
+      // Recent timesheets (last 10)
+      Timesheet.find({ employee: employeeId })
+        .populate('project', 'name code')
+        .sort({ date: -1 })
+        .limit(10)
+        .select('date hours description status project'),
+      // Monthly trend (last 6 months)
+      Timesheet.aggregate([
+        {
+          $match: {
+            employee: mongoose.Types.ObjectId(employeeId),
+            date: { $gte: new Date(now.getFullYear(), now.getMonth() - 5, 1) },
+            status: 'approved'
+          }
+        },
+        {
+          $group: {
+            _id: {
+              year: { $year: '$date' },
+              month: { $month: '$date' }
+            },
+            hours: { $sum: '$hours' },
+            count: { $sum: 1 }
+          }
+        },
+        { $sort: { '_id.year': 1, '_id.month': 1 } }
+      ])
+    ]);
+
+    // Hours by project
+    const hoursByProject = await Timesheet.aggregate([
+      { $match: { employee: mongoose.Types.ObjectId(employeeId), status: 'approved' } },
+      {
+        $group: {
+          _id: '$project',
+          totalHours: { $sum: '$hours' },
+          timesheetCount: { $sum: 1 }
+        }
+      },
+      {
+        $lookup: {
+          from: 'projects',
+          localField: '_id',
+          foreignField: '_id',
+          as: 'project'
+        }
+      },
+      { $unwind: '$project' },
+      {
+        $project: {
+          projectName: '$project.name',
+          projectCode: '$project.code',
+          totalHours: 1,
+          timesheetCount: 1
+        }
+      },
+      { $sort: { totalHours: -1 } }
+    ]);
+
+    // Calculate earnings (if hourly rate is set)
+    const user = await User.findById(employeeId).select('hourlyRate currency');
+    const estimatedEarnings = user.hourlyRate ? (totalHoursLogged[0]?.total || 0) * user.hourlyRate : null;
+    const monthlyEarnings = user.hourlyRate ? (monthlyHours[0]?.total || 0) * user.hourlyRate : null;
+
+    res.status(200).json({
+      success: true,
+      data: {
+        summary: {
+          totalHoursLogged: totalHoursLogged[0]?.total || 0,
+          monthlyHours: monthlyHours[0]?.total || 0,
+          weeklyHours: weeklyHours[0]?.total || 0,
+          pendingTimesheets,
+          approvedTimesheets,
+          rejectedTimesheets,
+          estimatedEarnings,
+          monthlyEarnings,
+          currency: user.currency || 'USD'
+        },
+        projectsWorkedOn,
+        hoursByProject,
+        recentTimesheets,
+        monthlyTrend: monthlyTrend.map(item => ({
+          month: `${item._id.year}-${String(item._id.month).padStart(2, '0')}`,
+          hours: item.hours,
+          count: item.count
+        }))
       }
     });
   } catch (error) {

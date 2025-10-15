@@ -60,6 +60,8 @@
                 <th class="table-header">Position</th>
                 <th class="table-header">Hourly Rate</th>
                 <th class="table-header">Status</th>
+                <th class="table-header">OTP</th>
+                <th class="table-header">Lock Until</th>
                 <th class="table-header">Actions</th>
               </tr>
             </thead>
@@ -89,6 +91,17 @@
                   </span>
                 </td>
                 <td class="table-cell">
+                  <span :class="employee.otpEnabled ? 'badge-success' : 'badge-secondary'" class="badge text-xs">
+                    {{ employee.otpEnabled ? 'Enabled' : 'Disabled' }}
+                  </span>
+                </td>
+                <td class="table-cell">
+                  <span v-if="employee.lockUntil && new Date(employee.lockUntil) > new Date()" class="badge badge-danger text-xs">
+                    {{ formatDate(employee.lockUntil) }}
+                  </span>
+                  <span v-else class="text-gray-400 text-sm">-</span>
+                </td>
+                <td class="table-cell">
                   <div class="flex space-x-2">
                     <button
                       @click="editEmployee(employee)"
@@ -96,6 +109,29 @@
                       title="Edit"
                     >
                       <Edit2 class="h-5 w-5" />
+                    </button>
+                    <button
+                      v-if="employee.isActive"
+                      @click="blockEmployee(employee)"
+                      class="text-orange-600 hover:text-orange-900"
+                      title="Block User"
+                    >
+                      <Ban class="h-5 w-5" />
+                    </button>
+                    <button
+                      v-else
+                      @click="unblockEmployee(employee)"
+                      class="text-green-600 hover:text-green-900"
+                      title="Unblock User"
+                    >
+                      <CheckCircle class="h-5 w-5" />
+                    </button>
+                    <button
+                      @click="toggleOTP(employee)"
+                      class="text-blue-600 hover:text-blue-900"
+                      :title="employee.otpEnabled ? 'Disable OTP' : 'Enable OTP'"
+                    >
+                      <Shield class="h-5 w-5" />
                     </button>
                     <button
                       @click="deleteEmployee(employee)"
@@ -146,10 +182,6 @@
                 <label class="label">Email *</label>
                 <input v-model="form.email" type="email" required class="input" />
               </div>
-              <div v-if="!showEditModal">
-                <label class="label">Password *</label>
-                <input v-model="form.password" type="password" required class="input" />
-              </div>
               <div>
                 <label class="label">Department</label>
                 <input v-model="form.department" type="text" class="input" />
@@ -161,6 +193,14 @@
               <div>
                 <label class="label">Hourly Rate</label>
                 <input v-model.number="form.hourlyRate" type="number" step="0.01" class="input" />
+              </div>
+              <div>
+                <label class="label">Currency</label>
+                <select v-model="form.currency" class="input">
+                  <option v-for="curr in currencies" :key="curr.code" :value="curr.code">
+                    {{ curr.code }} - {{ curr.name }} ({{ curr.symbol }})
+                  </option>
+                </select>
               </div>
               <div>
                 <label class="label">Role</label>
@@ -195,10 +235,12 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
+import { format } from 'date-fns'
 import MainLayout from '../../components/Layout/MainLayout.vue'
 import userService from '../../services/userService'
 import authService from '../../services/authService'
-import { UserPlus, Edit2, Trash2, Users, X, Loader2 } from 'lucide-vue-next'
+import utilityService from '../../services/utilityService'
+import { UserPlus, Edit2, Trash2, Users, X, Loader2, Ban, CheckCircle, Shield } from 'lucide-vue-next'
 
 const employees = ref([])
 const loading = ref(false)
@@ -217,13 +259,15 @@ const form = ref({
   firstName: '',
   lastName: '',
   email: '',
-  password: '',
   department: '',
   position: '',
   hourlyRate: 0,
+  currency: 'USD',
   role: 'employee',
   isActive: true
 })
+
+const currencies = ref([])
 
 const selectedEmployee = ref(null)
 
@@ -257,10 +301,47 @@ const editEmployee = (employee) => {
     department: employee.department || '',
     position: employee.position || '',
     hourlyRate: employee.hourlyRate || 0,
+    currency: employee.currency || 'USD',
     role: employee.role,
     isActive: employee.isActive
   }
   showEditModal.value = true
+}
+
+const blockEmployee = async (employee) => {
+  if (!confirm(`Are you sure you want to block ${employee.firstName} ${employee.lastName}?`)) {
+    return
+  }
+  
+  try {
+    await userService.blockUser(employee._id)
+    await fetchEmployees()
+  } catch (error) {
+    alert(error.response?.data?.message || 'Error blocking employee')
+  }
+}
+
+const unblockEmployee = async (employee) => {
+  try {
+    await userService.unblockUser(employee._id)
+    await fetchEmployees()
+  } catch (error) {
+    alert(error.response?.data?.message || 'Error unblocking employee')
+  }
+}
+
+const toggleOTP = async (employee) => {
+  const action = employee.otpEnabled ? 'disable' : 'enable'
+  if (!confirm(`Are you sure you want to ${action} OTP for ${employee.firstName} ${employee.lastName}?`)) {
+    return
+  }
+  
+  try {
+    await userService.toggleUserOTP(employee._id, !employee.otpEnabled)
+    await fetchEmployees()
+  } catch (error) {
+    alert(error.response?.data?.message || 'Error toggling OTP')
+  }
 }
 
 const deleteEmployee = async (employee) => {
@@ -284,7 +365,7 @@ const handleSubmit = async () => {
     if (showEditModal.value) {
       await userService.updateUser(selectedEmployee.value._id, form.value)
     } else {
-      await authService.register(form.value)
+      await userService.createUser(form.value)
     }
     await fetchEmployees()
     closeModal()
@@ -304,16 +385,31 @@ const closeModal = () => {
     firstName: '',
     lastName: '',
     email: '',
-    password: '',
     department: '',
     position: '',
     hourlyRate: 0,
+    currency: 'USD',
     role: 'employee',
     isActive: true
   }
 }
 
+const formatDate = (date) => {
+  if (!date) return '-'
+  return format(new Date(date), 'MMM dd, yyyy HH:mm')
+}
+
+const fetchCurrencies = async () => {
+  try {
+    const response = await utilityService.getCurrencies()
+    currencies.value = response.data || []
+  } catch (error) {
+    console.error('Error fetching currencies:', error)
+  }
+}
+
 onMounted(() => {
   fetchEmployees()
+  fetchCurrencies()
 })
 </script>

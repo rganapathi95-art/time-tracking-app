@@ -51,6 +51,41 @@ exports.loginValidation = [
     .notEmpty().withMessage('Password is required')
 ];
 
+// Admin creates user validation (no password required)
+exports.createUserValidation = [
+  body('firstName')
+    .trim()
+    .notEmpty().withMessage('First name is required')
+    .isLength({ max: 50 }).withMessage('First name cannot exceed 50 characters'),
+  body('lastName')
+    .trim()
+    .notEmpty().withMessage('Last name is required')
+    .isLength({ max: 50 }).withMessage('Last name cannot exceed 50 characters'),
+  body('email')
+    .trim()
+    .notEmpty().withMessage('Email is required')
+    .isEmail().withMessage('Please provide a valid email')
+    .normalizeEmail(),
+  body('role')
+    .optional()
+    .isIn(['admin', 'employee']).withMessage('Invalid role'),
+  body('department')
+    .optional()
+    .trim()
+    .isLength({ max: 100 }).withMessage('Department cannot exceed 100 characters'),
+  body('position')
+    .optional()
+    .trim()
+    .isLength({ max: 100 }).withMessage('Position cannot exceed 100 characters'),
+  body('hourlyRate')
+    .optional()
+    .isFloat({ min: 0 }).withMessage('Hourly rate must be a positive number'),
+  body('currency')
+    .optional()
+    .trim()
+    .isLength({ min: 3, max: 3 }).withMessage('Currency code must be 3 characters')
+];
+
 exports.updateUserValidation = [
   body('firstName')
     .optional()

@@ -24,6 +24,11 @@ const costCenterSchema = new mongoose.Schema({
     min: [0, 'Budget cannot be negative'],
     default: 0
   },
+  currency: {
+    type: String,
+    default: 'USD',
+    trim: true
+  },
   department: {
     type: String,
     trim: true

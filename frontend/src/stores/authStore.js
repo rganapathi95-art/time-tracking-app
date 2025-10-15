@@ -22,6 +22,14 @@ export const useAuthStore = defineStore('auth', {
       this.error = null
       try {
         const response = await authService.login(credentials)
+        
+        // Check if OTP is required
+        if (response.data?.requireOtp) {
+          // Don't store token/user yet, return response for OTP flow
+          return response
+        }
+        
+        // Normal login flow
         this.user = response.data.user
         this.token = response.data.token
         localStorage.setItem('user', JSON.stringify(response.data.user))

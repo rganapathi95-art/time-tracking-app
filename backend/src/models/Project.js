@@ -36,10 +36,25 @@ const projectSchema = new mongoose.Schema({
     min: [0, 'Budget cannot be negative'],
     default: 0
   },
+  currency: {
+    type: String,
+    default: 'USD',
+    trim: true
+  },
   status: {
     type: String,
     enum: ['planning', 'active', 'on-hold', 'completed', 'cancelled'],
     default: 'planning'
+  },
+  country: {
+    type: String,
+    trim: true,
+    maxlength: [100, 'Country name cannot exceed 100 characters']
+  },
+  elementNumber: {
+    type: String,
+    trim: true,
+    maxlength: [50, 'Element number cannot exceed 50 characters']
   },
   assignedEmployees: [{
     type: mongoose.Schema.Types.ObjectId,

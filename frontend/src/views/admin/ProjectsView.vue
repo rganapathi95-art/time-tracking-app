@@ -61,13 +61,21 @@
               <Building2 class="h-4 w-4 mr-2" />
               <span>{{ project.costCenter?.name }}</span>
             </div>
+            <div v-if="project.country" class="flex items-center text-gray-600">
+              <Globe class="h-4 w-4 mr-2" />
+              <span>{{ project.country }}</span>
+            </div>
+            <div v-if="project.elementNumber" class="flex items-center text-gray-600">
+              <Hash class="h-4 w-4 mr-2" />
+              <span>Element: {{ project.elementNumber }}</span>
+            </div>
             <div class="flex items-center text-gray-600">
               <Calendar class="h-4 w-4 mr-2" />
               <span>{{ formatDate(project.startDate) }} - {{ project.endDate ? formatDate(project.endDate) : 'Ongoing' }}</span>
             </div>
             <div class="flex items-center text-gray-600">
               <DollarSign class="h-4 w-4 mr-2" />
-              <span>Budget: ${{ project.budget?.toLocaleString() || 0 }}</span>
+              <span>Budget: {{ formatCurrency(project.budget || 0, project.currency || 'USD') }}</span>
             </div>
             <div class="flex items-center text-gray-600">
               <Users class="h-4 w-4 mr-2" />
@@ -159,6 +167,22 @@
                 <label class="label">Budget</label>
                 <input v-model.number="form.budget" type="number" step="0.01" class="input" />
               </div>
+              <div>
+                <label class="label">Currency</label>
+                <select v-model="form.currency" class="input">
+                  <option v-for="curr in currencies" :key="curr.code" :value="curr.code">
+                    {{ curr.code }} - {{ curr.name }} ({{ curr.symbol }})
+                  </option>
+                </select>
+              </div>
+              <div>
+                <label class="label">Country</label>
+                <input v-model="form.country" type="text" class="input" placeholder="e.g., United States" />
+              </div>
+              <div>
+                <label class="label">Element Number</label>
+                <input v-model="form.elementNumber" type="text" class="input" placeholder="e.g., EL-2024-001" />
+              </div>
               <div class="md:col-span-2">
                 <label class="label">Assigned Employees</label>
                 <select v-model="form.assignedEmployees" multiple class="input" size="5">
@@ -192,6 +216,7 @@ import MainLayout from '../../components/Layout/MainLayout.vue'
 import projectService from '../../services/projectService'
 import costCenterService from '../../services/costCenterService'
 import userService from '../../services/userService'
+import utilityService from '../../services/utilityService'
 import {
   FolderPlus,
   Edit2,
@@ -202,12 +227,15 @@ import {
   Building2,
   Calendar,
   DollarSign,
-  Users
+  Users,
+  Globe,
+  Hash
 } from 'lucide-vue-next'
 
 const projects = ref([])
 const costCenters = ref([])
 const employees = ref([])
+const currencies = ref([])
 const loading = ref(false)
 const showCreateModal = ref(false)
 const showEditModal = ref(false)
@@ -227,7 +255,10 @@ const form = ref({
   startDate: '',
   endDate: '',
   budget: 0,
+  currency: 'USD',
   status: 'planning',
+  country: '',
+  elementNumber: '',
   assignedEmployees: []
 })
 
@@ -273,7 +304,10 @@ const editProject = (project) => {
     startDate: project.startDate ? format(new Date(project.startDate), 'yyyy-MM-dd') : '',
     endDate: project.endDate ? format(new Date(project.endDate), 'yyyy-MM-dd') : '',
     budget: project.budget || 0,
+    currency: project.currency || 'USD',
     status: project.status,
+    country: project.country || '',
+    elementNumber: project.elementNumber || '',
     assignedEmployees: project.assignedEmployees?.map(e => e._id) || []
   }
   showEditModal.value = true
@@ -324,9 +358,26 @@ const closeModal = () => {
     startDate: '',
     endDate: '',
     budget: 0,
+    currency: 'USD',
     status: 'planning',
+    country: '',
+    elementNumber: '',
     assignedEmployees: []
   }
+}
+
+const fetchCurrencies = async () => {
+  try {
+    const response = await utilityService.getCurrencies()
+    currencies.value = response.data || []
+  } catch (error) {
+    console.error('Error fetching currencies:', error)
+  }
+}
+
+const formatCurrency = (amount, currencyCode) => {
+  const currency = currencies.value.find(c => c.code === currencyCode) || { symbol: '$' }
+  return `${currency.symbol}${amount.toLocaleString()}`
 }
 
 const getStatusClass = (status) => {
@@ -348,5 +399,6 @@ onMounted(() => {
   fetchProjects()
   fetchCostCenters()
   fetchEmployees()
+  fetchCurrencies()
 })
 </script>

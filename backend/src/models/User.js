@@ -66,6 +66,57 @@ const userSchema = new mongoose.Schema({
   lastFailedLoginAt: {
     type: Date,
     default: null
+  },
+  // OTP/2FA fields
+  otpEnabled: {
+    type: Boolean,
+    default: false
+  },
+  otpSecret: {
+    type: String,
+    select: false
+  },
+  otpExpiresAt: {
+    type: Date,
+    select: false
+  },
+  // Password reset fields
+  passwordResetToken: {
+    type: String,
+    select: false
+  },
+  passwordResetExpires: {
+    type: Date,
+    select: false
+  },
+  isPasswordSet: {
+    type: Boolean,
+    default: false
+  },
+  // Currency preference
+  currency: {
+    type: String,
+    default: 'USD',
+    trim: true
+  },
+  // Session management
+  activeSession: {
+    token: {
+      type: String,
+      select: false
+    },
+    deviceInfo: {
+      type: String,
+      select: false
+    },
+    ipAddress: {
+      type: String,
+      select: false
+    },
+    loginAt: {
+      type: Date,
+      select: false
+    }
   }
 }, {
   timestamps: true

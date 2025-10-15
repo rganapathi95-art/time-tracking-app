@@ -1,4 +1,6 @@
 const User = require('../models/User');
+const crypto = require('crypto');
+const { sendUserCreationEmail } = require('../config/email');
 
 // @desc    Get all users
 // @route   GET /api/users
@@ -194,6 +196,186 @@ exports.removeProject = async (req, res, next) => {
       success: true,
       message: 'Project removed successfully',
       data: user
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Block user (deactivate)
+// @route   PUT /api/users/:id/block
+// @access  Private/Admin
+exports.blockUser = async (req, res, next) => {
+  try {
+    const user = await User.findById(req.params.id);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    // Prevent admin from blocking themselves
+    if (user._id.toString() === req.user.id) {
+      return res.status(400).json({
+        success: false,
+        message: 'You cannot block your own account'
+      });
+    }
+
+    user.isActive = false;
+    await user.save({ validateBeforeSave: false });
+
+    res.status(200).json({
+      success: true,
+      message: 'User blocked successfully',
+      data: user
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Unblock user (activate)
+// @route   PUT /api/users/:id/unblock
+// @access  Private/Admin
+exports.unblockUser = async (req, res, next) => {
+  try {
+    const user = await User.findById(req.params.id);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    user.isActive = true;
+    await user.save({ validateBeforeSave: false });
+
+    res.status(200).json({
+      success: true,
+      message: 'User unblocked successfully',
+      data: user
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Create new user (Admin)
+// @route   POST /api/users
+// @access  Private/Admin
+exports.createUser = async (req, res, next) => {
+  try {
+    const { firstName, lastName, email, role, department, position, hourlyRate, currency } = req.body;
+
+    // Check if user exists
+    const userExists = await User.findOne({ email });
+    if (userExists) {
+      return res.status(400).json({
+        success: false,
+        message: 'User already exists with this email'
+      });
+    }
+
+    // Generate temporary password
+    const tempPassword = crypto.randomBytes(16).toString('hex');
+    
+    // Generate OTP (6 digits)
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    
+    // Generate password reset token
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    const hashedResetToken = crypto.createHash('sha256').update(resetToken).digest('hex');
+
+    // Create user
+    const user = await User.create({
+      firstName,
+      lastName,
+      email,
+      password: tempPassword,
+      role: role || 'employee',
+      department,
+      position,
+      hourlyRate,
+      currency: currency || 'USD',
+      isPasswordSet: false,
+      otpEnabled: true,
+      otpSecret: otp,
+      otpExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours
+      passwordResetToken: hashedResetToken,
+      passwordResetExpires: new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 hours
+    });
+
+    // Send email with OTP and password setup link
+    try {
+      await sendUserCreationEmail(email, otp, firstName, resetToken);
+    } catch (emailError) {
+      console.error('Failed to send user creation email:', emailError);
+      // Continue even if email fails - user is already created
+    }
+
+    res.status(201).json({
+      success: true,
+      message: 'User created successfully. An email has been sent with setup instructions.',
+      data: {
+        id: user._id,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        email: user.email,
+        role: user.role,
+        department: user.department,
+        position: user.position,
+        currency: user.currency
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Toggle user OTP preference (Admin)
+// @route   PUT /api/users/:id/toggle-otp
+// @access  Private/Admin
+exports.toggleUserOTP = async (req, res, next) => {
+  try {
+    const { otpEnabled } = req.body;
+
+    if (typeof otpEnabled !== 'boolean') {
+      return res.status(400).json({
+        success: false,
+        message: 'otpEnabled must be a boolean value'
+      });
+    }
+
+    const user = await User.findById(req.params.id);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    user.otpEnabled = otpEnabled;
+    
+    // Clear any existing OTP data when disabling
+    if (!otpEnabled) {
+      user.otpSecret = null;
+      user.otpExpiresAt = null;
+    }
+    
+    await user.save({ validateBeforeSave: false });
+
+    res.status(200).json({
+      success: true,
+      message: `OTP ${otpEnabled ? 'enabled' : 'disabled'} for user`,
+      data: {
+        userId: user._id,
+        otpEnabled: user.otpEnabled
+      }
     });
   } catch (error) {
     next(error);

@@ -19,5 +19,10 @@ export default {
   async getDashboardStats() {
     const response = await api.get('/analytics/dashboard-stats')
     return response.data
+  },
+
+  async getMyAnalytics() {
+    const response = await api.get('/analytics/my-analytics')
+    return response.data
   }
 }

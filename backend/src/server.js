@@ -12,10 +12,14 @@ const errorHandler = require('./middleware/errorHandler');
 // Route imports
 const authRoutes = require('./routes/authRoutes');
 const userRoutes = require('./routes/userRoutes');
+const profileRoutes = require('./routes/profileRoutes');
 const projectRoutes = require('./routes/projectRoutes');
 const costCenterRoutes = require('./routes/costCenterRoutes');
 const timesheetRoutes = require('./routes/timesheetRoutes');
 const analyticsRoutes = require('./routes/analyticsRoutes');
+const reportRoutes = require('./routes/reportRoutes');
+const utilityRoutes = require('./routes/utilityRoutes');
+const settingsRoutes = require('./routes/settingsRoutes');
 
 // Connect to database
 connectDB();
@@ -23,7 +27,8 @@ connectDB();
 const app = express();
 
 // CORS configuration: restrict to allowed origins
-const allowedOrigins = (process.env.ALLOWED_ORIGINS || 'http://localhost:5173,http://localhost:3000')
+// Tip: override with ALLOWED_ORIGINS in .env (comma-separated)
+const allowedOrigins = (process.env.ALLOWED_ORIGINS || 'http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000,http://127.0.0.1:3000')
   .split(',')
   .map((o) => o.trim());
 
@@ -33,6 +38,9 @@ const corsOptions = {
     if (!origin || allowedOrigins.indexOf(origin) !== -1) {
       callback(null, true);
     } else {
+      if (process.env.NODE_ENV === 'development') {
+        console.warn(`[CORS] Blocked origin: ${origin}. Allowed: ${allowedOrigins.join(', ')}`);
+      }
       callback(new Error('Not allowed by CORS'));
     }
   },
@@ -55,9 +63,9 @@ const limiter = rateLimit({
 });
 app.use('/api/', limiter);
 
-// Body parser
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+// Body parser (allow larger payloads for logo uploads)
+app.use(express.json({ limit: '5mb' }));
+app.use(express.urlencoded({ extended: true, limit: '5mb' }));
 
 // Logging
 if (process.env.NODE_ENV === 'development') {
@@ -76,10 +84,14 @@ app.get('/health', (req, res) => {
 // API routes
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
+app.use('/api/profile', profileRoutes);
 app.use('/api/projects', projectRoutes);
 app.use('/api/cost-centers', costCenterRoutes);
 app.use('/api/timesheets', timesheetRoutes);
 app.use('/api/analytics', analyticsRoutes);
+app.use('/api/reports', reportRoutes);
+app.use('/api/utilities', utilityRoutes);
+app.use('/api/settings', settingsRoutes);
 
 // 404 handler
 app.use((req, res) => {
