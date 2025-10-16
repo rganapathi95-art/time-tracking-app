@@ -71,6 +71,16 @@ const router = createRouter({
           path: 'settings',
           name: 'Settings',
           component: () => import('../views/admin/SettingsView.vue')
+        },
+        {
+          path: 'timesheet-periods',
+          name: 'TimesheetPeriods',
+          component: () => import('../views/admin/TimesheetPeriodsView.vue')
+        },
+        {
+          path: 'work-hour-limits',
+          name: 'WorkHourLimits',
+          component: () => import('../views/admin/WorkHourLimitsView.vue')
         }
       ]
     },

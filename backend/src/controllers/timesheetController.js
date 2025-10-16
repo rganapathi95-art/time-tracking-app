@@ -1,5 +1,8 @@
 const Timesheet = require('../models/Timesheet');
 const Project = require('../models/Project');
+const WorkHourLimit = require('../models/WorkHourLimit');
+const TimesheetPeriod = require('../models/TimesheetPeriod');
+const { sendTimesheetStatusNotification, sendHourLimitWarning } = require('../utils/notificationService');
 
 // @desc    Get all timesheets
 // @route   GET /api/timesheets
@@ -84,9 +87,8 @@ exports.getTimesheet = async (req, res, next) => {
 exports.createTimesheet = async (req, res, next) => {
   try {
     // Set employee to current user if not admin
-    if (req.user.role === 'employee') {
-      req.body.employee = req.user.id;
-    }
+    const employeeId = req.user.role === 'employee' ? req.user.id : req.body.employee;
+    req.body.employee = employeeId;
 
     // Verify employee has access to the project
     const project = await Project.findById(req.body.project);
@@ -108,6 +110,83 @@ exports.createTimesheet = async (req, res, next) => {
           success: false,
           message: 'You are not assigned to this project'
         });
+      }
+    }
+
+    // Check if date is within an allowed timesheet period
+    const checkDate = new Date(req.body.date);
+    const periods = await TimesheetPeriod.find({
+      status: 'active',
+      isActive: true,
+      startDate: { $lte: checkDate },
+      endDate: { $gte: checkDate }
+    });
+
+    const accessiblePeriod = periods.find(period => period.hasUserAccess(employeeId));
+    
+    if (!accessiblePeriod && req.user.role !== 'admin') {
+      return res.status(400).json({
+        success: false,
+        message: 'The selected date is not within any allowed timesheet period'
+      });
+    }
+
+    // Validate work hour limits (unless admin bypass)
+    if (req.user.role !== 'admin' || !req.body.bypassLimits) {
+      const limit = await WorkHourLimit.findOne({ employee: employeeId }) || 
+                    await WorkHourLimit.getOrCreateLimit(employeeId);
+
+      // Check daily limit
+      if (req.body.hours > limit.dailyLimit) {
+        return res.status(400).json({
+          success: false,
+          message: `Hours exceed daily limit of ${limit.dailyLimit} hours`,
+          limitType: 'daily',
+          limit: limit.dailyLimit
+        });
+      }
+
+      // Calculate week boundaries
+      const dayOfWeek = checkDate.getDay();
+      const weekStart = new Date(checkDate);
+      weekStart.setDate(checkDate.getDate() - dayOfWeek);
+      weekStart.setHours(0, 0, 0, 0);
+      
+      const weekEnd = new Date(weekStart);
+      weekEnd.setDate(weekStart.getDate() + 6);
+      weekEnd.setHours(23, 59, 59, 999);
+
+      // Get existing timesheets for the week
+      const weekTimesheets = await Timesheet.find({
+        employee: employeeId,
+        date: { $gte: weekStart, $lte: weekEnd },
+        status: { $in: ['approved', 'submitted', 'draft'] }
+      });
+
+      const currentWeekHours = weekTimesheets.reduce((sum, ts) => sum + ts.hours, 0);
+      const projectedTotal = currentWeekHours + req.body.hours;
+
+      // Check weekly limit
+      if (limit.enforceLimit && projectedTotal > limit.weeklyLimit) {
+        return res.status(400).json({
+          success: false,
+          message: `Adding ${req.body.hours} hours would exceed weekly limit of ${limit.weeklyLimit} hours (current: ${currentWeekHours} hours)`,
+          limitType: 'weekly',
+          currentHours: currentWeekHours,
+          limit: limit.weeklyLimit,
+          projectedTotal
+        });
+      }
+
+      // Check if near warning threshold
+      const percentage = (projectedTotal / limit.weeklyLimit) * 100;
+      if (percentage >= limit.warningThreshold && currentWeekHours < limit.weeklyLimit * (limit.warningThreshold / 100)) {
+        // Send warning notification
+        try {
+          await sendHourLimitWarning(employeeId, projectedTotal, limit.weeklyLimit, weekStart, weekEnd);
+        } catch (notifError) {
+          console.error('Error sending hour limit warning:', notifError);
+        }
       }
     }
 
@@ -171,6 +250,10 @@ exports.updateTimesheet = async (req, res, next) => {
       delete req.body.approvedAt;
     }
 
+    // Track status change for notifications
+    const oldStatus = timesheet.status;
+    const newStatus = req.body.status;
+
     // Handle approval
     if (req.body.status === 'approved' && req.user.role === 'admin') {
       req.body.approvedBy = req.user.id;
@@ -188,6 +271,15 @@ exports.updateTimesheet = async (req, res, next) => {
       .populate('employee', 'firstName lastName email')
       .populate('project', 'name code')
       .populate('approvedBy', 'firstName lastName');
+
+    // Send notification if status changed to approved or rejected
+    if (oldStatus !== newStatus && (newStatus === 'approved' || newStatus === 'rejected')) {
+      try {
+        await sendTimesheetStatusNotification(timesheet, newStatus, req.body.rejectionReason);
+      } catch (notifError) {
+        console.error('Error sending timesheet status notification:', notifError);
+      }
+    }
 
     res.status(200).json({
       success: true,

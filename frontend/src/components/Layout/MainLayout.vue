@@ -14,7 +14,8 @@
           <Menu class="h-6 w-6" />
         </button>
         <div class="flex-1"></div>
-        <!-- Optional: Add notifications, search, etc. here -->
+        <!-- Notifications -->
+        <NotificationDropdown />
       </div>
 
       <!-- Page Content -->
@@ -28,6 +29,7 @@
 <script setup>
 import { ref } from 'vue'
 import Sidebar from './Sidebar.vue'
+import NotificationDropdown from '../NotificationDropdown.vue'
 import { Menu } from 'lucide-vue-next'
 
 const isSidebarOpen = ref(false)

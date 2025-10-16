@@ -20,6 +20,9 @@ const analyticsRoutes = require('./routes/analyticsRoutes');
 const reportRoutes = require('./routes/reportRoutes');
 const utilityRoutes = require('./routes/utilityRoutes');
 const settingsRoutes = require('./routes/settingsRoutes');
+const timesheetPeriodRoutes = require('./routes/timesheetPeriodRoutes');
+const notificationRoutes = require('./routes/notificationRoutes');
+const workHourLimitRoutes = require('./routes/workHourLimitRoutes');
 
 // Connect to database
 connectDB();
@@ -35,8 +38,18 @@ const allowedOrigins = (process.env.ALLOWED_ORIGINS || 'http://localhost:5173,ht
 const corsOptions = {
   origin: function (origin, callback) {
     // Allow server-to-server or curl (no origin) and allowed origins
+    // In development, also allow local network IPs
     if (!origin || allowedOrigins.indexOf(origin) !== -1) {
       callback(null, true);
+    } else if (process.env.NODE_ENV === 'development' && origin) {
+      // Allow local network access in development (192.168.x.x, 10.x.x.x, 172.16-31.x.x)
+      const localNetworkPattern = /^https?:\/\/(localhost|127\.0\.0\.1|192\.168\.\d{1,3}\.\d{1,3}|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|172\.(1[6-9]|2[0-9]|3[0-1])\.\d{1,3}\.\d{1,3})(:\d+)?$/;
+      if (localNetworkPattern.test(origin)) {
+        callback(null, true);
+      } else {
+        console.warn(`[CORS] Blocked origin: ${origin}. Allowed: ${allowedOrigins.join(', ')}`);
+        callback(new Error('Not allowed by CORS'));
+      }
     } else {
       if (process.env.NODE_ENV === 'development') {
         console.warn(`[CORS] Blocked origin: ${origin}. Allowed: ${allowedOrigins.join(', ')}`);
@@ -92,6 +105,9 @@ app.use('/api/analytics', analyticsRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/utilities', utilityRoutes);
 app.use('/api/settings', settingsRoutes);
+app.use('/api/timesheet-periods', timesheetPeriodRoutes);
+app.use('/api/notifications', notificationRoutes);
+app.use('/api/work-hour-limits', workHourLimitRoutes);
 
 // 404 handler
 app.use((req, res) => {
@@ -105,9 +121,10 @@ app.use((req, res) => {
 app.use(errorHandler);
 
 const PORT = process.env.PORT || 5000;
+const HOST = process.env.HOST || '0.0.0.0'; // Listen on all network interfaces
 
-const server = app.listen(PORT, () => {
-  console.log(`Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);
+const server = app.listen(PORT, HOST, () => {
+  console.log(`Server running in ${process.env.NODE_ENV} mode on ${HOST}:${PORT}`);
 });
 
 // Handle unhandled promise rejections

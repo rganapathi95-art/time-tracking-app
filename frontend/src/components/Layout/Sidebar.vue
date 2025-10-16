@@ -138,7 +138,10 @@ import {
   Settings,
   User,
   LogOut,
-  X
+  X,
+  Calendar,
+  Bell as BellIcon,
+  Timer
 } from 'lucide-vue-next'
 import settingsService from '../../services/settingsService'
 
@@ -181,6 +184,8 @@ const adminMenuItems = [
   { name: 'Projects', path: '/admin/projects', icon: FolderKanban },
   { name: 'Cost Centers', path: '/admin/cost-centers', icon: Building2 },
   { name: 'Timesheets', path: '/admin/timesheets', icon: ClipboardList },
+  { name: 'Timesheet Periods', path: '/admin/timesheet-periods', icon: Calendar },
+  { name: 'Work Hour Limits', path: '/admin/work-hour-limits', icon: Timer },
   { name: 'Analytics', path: '/admin/analytics', icon: BarChart3 },
   { name: 'Reports', path: '/admin/reports', icon: FileText },
   { name: 'Settings', path: '/admin/settings', icon: Settings }

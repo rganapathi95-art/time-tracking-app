@@ -8,6 +8,38 @@
           Add Timesheet
         </button>
       </div>
+
+      <!-- Work Hour Limit Info -->
+      <div v-if="weeklyHours" class="card mb-6">
+        <div class="flex items-center justify-between">
+          <div>
+            <h3 class="text-sm font-medium text-gray-700">Weekly Hours</h3>
+            <div class="mt-2 flex items-baseline">
+              <p class="text-2xl font-semibold text-gray-900">{{ weeklyHours.totalHours }}h</p>
+              <p class="ml-2 text-sm text-gray-500">/ {{ weeklyHours.limit }}h</p>
+            </div>
+          </div>
+          <div class="text-right">
+            <div class="text-sm text-gray-500">{{ weeklyHours.percentage }}% used</div>
+            <div class="mt-1">
+              <span v-if="weeklyHours.isOverLimit" class="badge badge-danger">Over Limit</span>
+              <span v-else-if="weeklyHours.isNearLimit" class="badge badge-warning">Near Limit</span>
+              <span v-else class="badge badge-success">Within Limit</span>
+            </div>
+          </div>
+        </div>
+        <div class="mt-3">
+          <div class="w-full bg-gray-200 rounded-full h-2">
+            <div
+              :class="[
+                'h-2 rounded-full transition-all',
+                weeklyHours.isOverLimit ? 'bg-red-600' : weeklyHours.isNearLimit ? 'bg-yellow-500' : 'bg-green-500'
+              ]"
+              :style="{ width: Math.min(weeklyHours.percentage, 100) + '%' }"
+            ></div>
+          </div>
+        </div>
+      </div>
       
       <!-- Filters -->
       <div class="card mb-6">
@@ -193,15 +225,19 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { format } from 'date-fns'
 import MainLayout from '../../components/Layout/MainLayout.vue'
 import timesheetService from '../../services/timesheetService'
 import projectService from '../../services/projectService'
+import workHourLimitService from '../../services/workHourLimitService'
 import { Plus, Edit2, Trash2, Clock, X, Loader2, Send } from 'lucide-vue-next'
+import { useAuthStore } from '../../stores/authStore'
 
+const authStore = useAuthStore()
 const timesheets = ref([])
 const projects = ref([])
+const weeklyHours = ref(null)
 const loading = ref(false)
 const showCreateModal = ref(false)
 const showEditModal = ref(false)
@@ -242,6 +278,18 @@ const fetchProjects = async () => {
     projects.value = response.data
   } catch (error) {
     console.error('Error fetching projects:', error)
+  }
+}
+
+const fetchWeeklyHours = async () => {
+  try {
+    const userId = authStore.user?.id || authStore.user?._id
+    if (userId) {
+      const response = await workHourLimitService.checkCurrentWeekHours(userId)
+      weeklyHours.value = response.data
+    }
+  } catch (error) {
+    console.error('Error fetching weekly hours:', error)
   }
 }
 
@@ -302,6 +350,7 @@ const handleSubmit = async () => {
       await timesheetService.createTimesheet(form.value)
     }
     await fetchTimesheets()
+    await fetchWeeklyHours()
     closeModal()
   } catch (error) {
     formError.value = error.response?.data?.message || 'Error saving timesheet'
@@ -341,5 +390,6 @@ const formatDate = (date) => {
 onMounted(() => {
   fetchTimesheets()
   fetchProjects()
+  fetchWeeklyHours()
 })
 </script>

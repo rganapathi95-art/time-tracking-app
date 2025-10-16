@@ -117,6 +117,45 @@ const userSchema = new mongoose.Schema({
       type: Date,
       select: false
     }
+  },
+  // Notification preferences
+  notificationPreferences: {
+    email: {
+      timesheetReminders: {
+        type: Boolean,
+        default: true
+      },
+      timesheetApproval: {
+        type: Boolean,
+        default: true
+      },
+      periodOpened: {
+        type: Boolean,
+        default: true
+      },
+      hourLimitWarning: {
+        type: Boolean,
+        default: true
+      }
+    },
+    inApp: {
+      timesheetReminders: {
+        type: Boolean,
+        default: true
+      },
+      timesheetApproval: {
+        type: Boolean,
+        default: true
+      },
+      periodOpened: {
+        type: Boolean,
+        default: true
+      },
+      hourLimitWarning: {
+        type: Boolean,
+        default: true
+      }
+    }
   }
 }, {
   timestamps: true
